@@ -151,6 +151,9 @@ func (s *Scanner) scanToken() {
 		}
 		break
 	case ' ', '\r', '\t': break
+	case '\n':
+		s.line += 1
+		break
 	default:
 		reportError(s.line, "Unexpected charactor")
 		break
