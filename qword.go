@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"bufio"
 	"strings"
+	"strconv"
 )
 
 type TokenKind int
@@ -57,14 +58,72 @@ const (
 	NIL
 )
 
+var KEYWORDS = map[string]TokenKind{
+	"false": FALSE,
+	"and": AND,
+	"or": OR,
+	"var": VAR,
+	"struct": STRUCT,
+	"fun": FUN,
+	"return": RETURN,
+	"while": WHILE,
+	"for": FOR,
+	"if": IF,
+	"else": ELSE,
+	"print": PRINT,
+	"nil": NIL,
+}
+
+type LiteralKind int
+
+const (
+	LiteralNumber LiteralKind = iota
+	LiteralString
+	LiteralNone
+) 
+
+type Literal struct {
+	kind   LiteralKind
+	number int
+	str   string
+}
+
+func newLiteralNumber(value int) Literal {
+	return Literal{
+		kind: LiteralNumber,
+		number: value,
+	}
+}
+
+func newLiteralString(value string) Literal {
+	return Literal{
+		kind: LiteralString,
+		str:  value,
+	}
+}
+
+func newLiteralNone() Literal {
+	return Literal{
+		kind: LiteralNone,
+	}
+}
+
 type Token struct {
 	kind    TokenKind
 	lexeme  string
-	literal string
+	literal Literal
 	line    int
 }
 
+
+
 func (t *Token) String() string {
+	if t.kind == NUMBER {
+		return t.lexeme + " Literal: " + string(t.literal.number)
+	} else if t.kind == STRING {
+		return t.lexeme + " Literal: " + string(t.literal.str)
+	}
+
 	return t.lexeme
 }
 
@@ -86,17 +145,20 @@ func newScanner(source string) *Scanner {
 	}
 }
 
-func (s *Scanner) scanTokens() []Token {
+func (s *Scanner) scanTokens() ([]Token, error) {
 	for !s.isAtEnd() {
 		s.start = s.current
-		s.scanToken()
+		err := s.scanToken()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	s.tokens = append(s.tokens, Token{EOF, "", "", s.line})
-	return s.tokens
+	s.tokens = append(s.tokens, Token{EOF, "", newLiteralNone(), s.line})
+	return s.tokens, nil
 }
 
-func (s *Scanner) scanToken() {
+func (s *Scanner) scanToken() error {
 	c := s.advance()
 	switch c {
 	case '(': s.addToken(LEFT_PAREN); break;
@@ -154,10 +216,77 @@ func (s *Scanner) scanToken() {
 	case '\n':
 		s.line += 1
 		break
+	case '"':
+		s.scanString()
+		break
 	default:
-		reportError(s.line, "Unexpected charactor")
+		if (isDigit(c)) {
+			err := s.scanNumber()
+			if err != nil {
+				return err
+			}
+		} else if isAlpha(c) {
+			s.scanIdentifier()
+		} else {
+			reportError(s.line, "Unexpected charactor.")
+		}
 		break
 	}
+	return nil
+}
+
+func (s *Scanner) scanString() {
+	for s.peek() != '"' && !s.isAtEnd() {
+		if s.peek() == '\n' {
+			s.line += 1
+		}
+		s.advance()
+	}
+
+	if s.isAtEnd() {
+		reportError(s.line, "Unterminated string.")
+	}
+
+	s.advance() // eat right side double quotation
+
+	value := s.source[s.start+1:s.current-1]
+	literal := newLiteralString(value)
+	s.addTokenWithLiteral(STRING, literal)
+}
+
+func (s *Scanner) scanNumber() error {
+	for isDigit(s.peek()) {
+		s.advance()
+	}
+	if s.peek() == '.' && isDigit(s.peekNext()) {
+		s.advance()
+		for isDigit(s.peek()) {
+			s.advance()
+		}
+	}
+
+	value, err := strconv.Atoi(s.source[s.start:s.current])
+	if err != nil {
+		return err
+	}
+
+	literal := newLiteralNumber(value)
+	s.addTokenWithLiteral(NUMBER, literal)
+
+	return nil
+}
+
+func (s *Scanner) scanIdentifier() {
+	for isAlphaNumeric(s.peek()) {
+		s.advance()
+	}
+
+	text := s.source[s.start:s.current]
+	kind, ok := KEYWORDS[text]
+	if !ok {
+		kind = IDENTIFIER
+	}
+	s.addToken(kind)
 }
 
 func (s *Scanner) isAtEnd() bool {
@@ -187,13 +316,34 @@ func (s *Scanner) peek() rune {
 	return rune(s.source[s.current])
 }
 
-func (s *Scanner) addToken(kind TokenKind) {
-	s.addTokenWithLiteral(kind, "")
+func (s *Scanner) peekNext() rune {
+	if s.current + 1 >= len(s.source) {
+		return '\000'
+	}
+	return rune(s.source[s.current+1])
 }
 
-func (s *Scanner) addTokenWithLiteral(kind TokenKind, literal string) {
+func (s *Scanner) addToken(kind TokenKind) {
+	s.addTokenWithLiteral(kind, Literal{kind: LiteralNone})
+}
+
+func (s *Scanner) addTokenWithLiteral(kind TokenKind, literal Literal) {
 	text := s.source[s.start:s.current]
 	s.tokens = append(s.tokens, Token{kind, text, literal, s.line})
+}
+
+func isDigit(c rune) bool {
+	return c >= '0' && c <= '9'
+}
+
+func isAlpha(c rune) bool {
+	return (c >= 'a' && c <= 'z') ||
+		(c >= 'A' && c <= 'Z') ||
+		c == '_'
+}
+
+func isAlphaNumeric(c rune) bool {
+	return isAlpha(c) || isDigit(c)
 }
 
 type Runner struct {
@@ -238,7 +388,10 @@ func (r *Runner) runPrompt() error {
 
 func (r *Runner) Run(source string) error {
 	scanner := newScanner(source)
-	tokens := scanner.scanTokens()
+	tokens, err := scanner.scanTokens()
+	if err != nil {
+		return err
+	}
 	fmt.Println("Tokens", len(tokens))
 
 	for _, token := range tokens {
