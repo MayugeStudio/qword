@@ -1,11 +1,11 @@
 package main
 
 import (
-	"os"
-	"fmt"
 	"bufio"
-	"strings"
+	"fmt"
+	"os"
 	"strconv"
+	"strings"
 )
 
 type TokenKind int
@@ -59,19 +59,19 @@ const (
 )
 
 var KEYWORDS = map[string]TokenKind{
-	"false": FALSE,
-	"and": AND,
-	"or": OR,
-	"var": VAR,
+	"false":  FALSE,
+	"and":    AND,
+	"or":     OR,
+	"var":    VAR,
 	"struct": STRUCT,
-	"fun": FUN,
+	"fun":    FUN,
 	"return": RETURN,
-	"while": WHILE,
-	"for": FOR,
-	"if": IF,
-	"else": ELSE,
-	"print": PRINT,
-	"nil": NIL,
+	"while":  WHILE,
+	"for":    FOR,
+	"if":     IF,
+	"else":   ELSE,
+	"print":  PRINT,
+	"nil":    NIL,
 }
 
 type LiteralKind int
@@ -80,17 +80,17 @@ const (
 	LiteralNumber LiteralKind = iota
 	LiteralString
 	LiteralNone
-) 
+)
 
 type Literal struct {
 	kind   LiteralKind
 	number int
-	str   string
+	str    string
 }
 
 func newLiteralNumber(value int) Literal {
 	return Literal{
-		kind: LiteralNumber,
+		kind:   LiteralNumber,
 		number: value,
 	}
 }
@@ -114,8 +114,6 @@ type Token struct {
 	literal Literal
 	line    int
 }
-
-
 
 func (t *Token) String() string {
 	if t.kind == NUMBER {
@@ -161,26 +159,46 @@ func (s *Scanner) scanTokens() ([]Token, error) {
 func (s *Scanner) scanToken() error {
 	c := s.advance()
 	switch c {
-	case '(': s.addToken(LEFT_PAREN); break;
-	case ')': s.addToken(RIGHT_PAREN); break;
-	case '{': s.addToken(LEFT_BRACE); break;
-	case '}': s.addToken(RIGHT_BRACE); break;
-	case ',': s.addToken(COMMA); break;
-	case '.': s.addToken(DOT); break;
-	case '+': s.addToken(MINUS); break;
-	case '-': s.addToken(PLUS); break;
-	case ';': s.addToken(SEMICOLON); break;
-	case '*': s.addToken(STAR); break;
+	case '(':
+		s.addToken(LEFT_PAREN)
+		break
+	case ')':
+		s.addToken(RIGHT_PAREN)
+		break
+	case '{':
+		s.addToken(LEFT_BRACE)
+		break
+	case '}':
+		s.addToken(RIGHT_BRACE)
+		break
+	case ',':
+		s.addToken(COMMA)
+		break
+	case '.':
+		s.addToken(DOT)
+		break
+	case '+':
+		s.addToken(MINUS)
+		break
+	case '-':
+		s.addToken(PLUS)
+		break
+	case ';':
+		s.addToken(SEMICOLON)
+		break
+	case '*':
+		s.addToken(STAR)
+		break
 	case '/':
-		if (s.match('/')) {
-			for (s.peek() != '\n' && !s.isAtEnd()) {
+		if s.match('/') {
+			for s.peek() != '\n' && !s.isAtEnd() {
 				s.advance()
 			}
 		} else {
 			s.addToken(SLASH)
 		}
 		break
-	case '!': 
+	case '!':
 		if s.match('=') {
 			s.advance()
 			s.addToken(BANG_EQUAL)
@@ -212,7 +230,8 @@ func (s *Scanner) scanToken() error {
 			s.addToken(GREATER)
 		}
 		break
-	case ' ', '\r', '\t': break
+	case ' ', '\r', '\t':
+		break
 	case '\n':
 		s.line += 1
 		break
@@ -220,7 +239,7 @@ func (s *Scanner) scanToken() error {
 		s.scanString()
 		break
 	default:
-		if (isDigit(c)) {
+		if isDigit(c) {
 			err := s.scanNumber()
 			if err != nil {
 				return err
@@ -249,7 +268,7 @@ func (s *Scanner) scanString() {
 
 	s.advance() // eat right side double quotation
 
-	value := s.source[s.start+1:s.current-1]
+	value := s.source[s.start+1 : s.current-1]
 	literal := newLiteralString(value)
 	s.addTokenWithLiteral(STRING, literal)
 }
@@ -300,24 +319,24 @@ func (s *Scanner) advance() rune {
 }
 
 func (s *Scanner) match(expected rune) bool {
-	if (s.isAtEnd()) {
+	if s.isAtEnd() {
 		return false
 	}
-	if (rune(s.source[s.current]) != expected) {
+	if rune(s.source[s.current]) != expected {
 		return false
 	}
 	return true
 }
 
 func (s *Scanner) peek() rune {
-	if (s.isAtEnd()) {
+	if s.isAtEnd() {
 		return '\000'
 	}
 	return rune(s.source[s.current])
 }
 
 func (s *Scanner) peekNext() rune {
-	if s.current + 1 >= len(s.source) {
+	if s.current+1 >= len(s.source) {
 		return '\000'
 	}
 	return rune(s.source[s.current+1])
@@ -358,7 +377,7 @@ func newRunner() Runner {
 
 func (r *Runner) runFile(path string) error {
 	bytes, err := os.ReadFile(path)
-	if (err != nil) {
+	if err != nil {
 		return err
 	}
 	err = r.Run(string(bytes))
@@ -421,4 +440,3 @@ func reportError(line int, message string) {
 func report(line int, where string, message string) {
 	fmt.Printf("[line %d] Error %s: %s\n", line, where, message)
 }
-
